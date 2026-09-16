@@ -7,6 +7,7 @@ Automation MUST NOT modify this section.
 - Follow least-privilege security practices.
 - Keep learner-facing instructions concise and action-oriented.
 - Use Node.js 20 for repository automation.
+- Prefer small, focused pull requests.
 
 <!-- learned-rules:start -->
 ## Learned rules
