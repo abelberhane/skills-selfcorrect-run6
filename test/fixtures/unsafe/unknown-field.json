@@ -1,0 +1,19 @@
+{
+  "repository": "octocat/self-correcting-copilot-instructions",
+  "comment_id": 98765,
+  "actor": {
+    "login": "maintainer",
+    "association": "OWNER"
+  },
+  "pull_request": {
+    "number": 42,
+    "author": "octocat",
+    "labels": [
+      "copilot-authored",
+      "copilot-correction"
+    ]
+  },
+  "body": "/copilot-learn\ncategory: TEST\nrule: Add tests for parser changes.\nrationale: Regression coverage is required.\nscope: repository\nshell: rm -rf .",
+  "existing_rules": [],
+  "fixture": "unknown-field"
+}

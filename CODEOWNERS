@@ -1,0 +1,12 @@
+# Governance files require explicit maintainer review.
+#
+# Replace @OWNER with your GitHub handle or team (for example @octocat or @my-org/maintainers).
+# Until you do, GitHub shows a CODEOWNERS syntax warning. This does not affect the exercise,
+# because these paths are also enforced in code by PROTECTED_PATHS in scripts/lib.js.
+.github/copilot-instructions.md @OWNER
+.github/learning-config.yml @OWNER
+.github/auto-merge-policy.yml @OWNER
+.github/workflows/ @OWNER
+schemas/ @OWNER
+scripts/ @OWNER
+CODEOWNERS @OWNER

@@ -1,0 +1,19 @@
+{
+  "repository": "octocat/self-correcting-copilot-instructions",
+  "comment_id": 98765,
+  "actor": {
+    "login": "maintainer",
+    "association": "OWNER"
+  },
+  "pull_request": {
+    "number": 42,
+    "author": "octocat",
+    "labels": [
+      "copilot-authored",
+      "copilot-correction"
+    ]
+  },
+  "body": "/copilot-learn\ncategory: STYLE\nrule: Always rename this current variable to x.\nrationale: The current pull request used a long local name.\nscope: repository",
+  "existing_rules": [],
+  "fixture": "overfit"
+}

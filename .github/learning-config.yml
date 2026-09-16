@@ -1,0 +1,31 @@
+version: 1
+command: /copilot-learn
+simulation: deterministic
+trusted_associations:
+  - OWNER
+  - MEMBER
+trusted_logins: []
+allowed_fields:
+  - category
+  - rule
+  - rationale
+  - scope
+  - action
+  - target_id
+categories:
+  - STYLE
+  - CODE
+  - ARCH
+  - TOOL
+  - PROCESS
+  - DATA
+  - UX
+  - TEST
+  - SECURITY
+  - OTHER
+states:
+  - proposed
+  - active
+  - superseded
+  - revoked
+  - blocked

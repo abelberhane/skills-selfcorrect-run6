@@ -1,0 +1,20 @@
+version: 1
+enabled: false
+method: squash
+allowed_risk: low
+required_labels:
+  - copilot-instruction-candidate
+required_checks:
+  - Evaluate instruction candidate
+allowed_paths:
+  - .github/copilot-instructions.md
+  - data/candidates/
+  - data/audit/
+  - data/fingerprints/
+blocked_categories:
+  - ARCH
+  - PROCESS
+  - SECURITY
+max_rule_length: 180
+require_trusted_provenance: true
+require_no_open_contradictions: true

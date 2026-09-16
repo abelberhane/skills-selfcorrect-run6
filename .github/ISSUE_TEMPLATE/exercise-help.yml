@@ -1,0 +1,23 @@
+name: Exercise help
+description: Ask for help with a Self-correcting Copilot instructions step
+title: "[Exercise help] "
+labels: ["copilot-needs-human-review"]
+body:
+  - type: dropdown
+    id: step
+    attributes:
+      label: Step
+      options: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include the failing check and sanitized output. Never paste a secret.
+    validations:
+      required: true
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What have you tried?

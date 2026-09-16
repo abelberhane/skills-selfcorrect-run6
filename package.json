@@ -1,0 +1,23 @@
+{
+  "name": "self-correcting-copilot-instructions",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "yaml": "2.9.0"
+  },
+  "description": "A deterministic GitHub Skills exercise for governed Copilot instruction updates.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test",
+    "validate": "node scripts/validate-repository.js",
+    "simulate": "node scripts/simulate.js",
+    "check-step": "node scripts/check-step.js",
+    "decide": "node scripts/decide.js",
+    "coverage": "node -e \"const{testCoverage}=require('./scripts/lib');const r=testCoverage('src/cart.js','test/cart.test.js');console.log(r.uncovered.length?'Untested exports: '+r.uncovered.join(', '):'Every exported function has a test.')\""
+  },
+  "license": "MIT"
+}

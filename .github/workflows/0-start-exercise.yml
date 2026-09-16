@@ -1,0 +1,90 @@
+name: Step 0 # Start Exercise
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+env:
+  STEP_1_FILE: ".github/steps/1-step.md"
+
+jobs:
+  start_exercise:
+    if: |
+      !github.event.repository.is_template
+    name: Start Exercise
+    uses: skills/exercise-toolkit/.github/workflows/start-exercise.yml@v0.9.1
+    with:
+      exercise-title: "Self-correcting Copilot instructions"
+      intro-message: "Welcome! Start with the one-time setup in step 1 below - Actions needs permission to open pull requests, because that is how every proposal in this exercise arrives. Then you will review a pull request, spot a problem, and turn your feedback into a rule that Copilot actually follows - instead of a comment everyone forgets. In Lesson 2 you will let the safe corrections merge themselves. Everything runs deterministically on Node.js 20, with no model API and no secrets. Let's get started! 🚀"
+
+  provision_labels:
+    name: Provision pipeline labels
+    runs-on: ubuntu-latest
+    needs: [start_exercise]
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # Creates the copilot-* labels the proposal and evaluation workflows rely on.
+      # list-labels.js is intentionally dependency-free because it runs before `npm ci`.
+      - name: Create exercise labels
+        run: |
+          set -euo pipefail
+          node scripts/list-labels.js > "$RUNNER_TEMP/labels.tsv"
+          while IFS=$'\t' read -r name color description; do
+            [ -n "$name" ] || continue
+            gh label create "$name" --color "$color" --description "$description" --force
+          done < "$RUNNER_TEMP/labels.tsv"
+
+  post_next_step_content:
+    name: Post next step content
+    runs-on: ubuntu-latest
+    needs: [start_exercise, provision_labels]
+    env:
+      ISSUE_REPOSITORY: ${{ github.repository }}
+      ISSUE_NUMBER: ${{ needs.start_exercise.outputs.issue-number }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Get response templates
+        uses: actions/checkout@v6
+        with:
+          repository: skills/exercise-toolkit
+          path: exercise-toolkit
+          ref: v0.9.1
+
+      - name: Create comment - add step content
+        uses: GrantBirki/comment@v2.1.1
+        with:
+          repository: ${{ env.ISSUE_REPOSITORY }}
+          issue-number: ${{ env.ISSUE_NUMBER }}
+          file: ${{ env.STEP_1_FILE }}
+          vars: |
+            login: ${{ github.actor }}
+            full_repo_name: ${{ github.repository }}
+
+      - name: Create comment - watching for progress
+        uses: GrantBirki/comment@v2.1.1
+        with:
+          repository: ${{ env.ISSUE_REPOSITORY }}
+          issue-number: ${{ env.ISSUE_NUMBER }}
+          file: exercise-toolkit/markdown-templates/step-feedback/watching-for-progress.md
+
+      - name: Enable next step workflow
+        run: gh workflow enable "Step 1"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

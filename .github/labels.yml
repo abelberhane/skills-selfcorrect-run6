@@ -1,0 +1,21 @@
+- name: copilot-authored
+  color: "0969da"
+  description: Pull request associated with Copilot-generated work
+- name: copilot-correction
+  color: "8250df"
+  description: Contains an explicit maintainer correction
+- name: copilot-instruction-candidate
+  color: "1f883d"
+  description: Proposed repository instruction update
+- name: copilot-low-risk
+  color: "2da44e"
+  description: Deterministically evaluated as low risk
+- name: copilot-auto-merge-approved
+  color: "0e8a16"
+  description: Meets the repository auto-merge policy
+- name: copilot-needs-human-review
+  color: "fbca04"
+  description: Ambiguous or elevated-risk candidate
+- name: copilot-blocked
+  color: "d1242f"
+  description: Candidate failed a safety or governance check

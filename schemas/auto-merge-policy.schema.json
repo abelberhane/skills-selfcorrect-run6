@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Auto-merge policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "enabled",
+    "method",
+    "allowed_risk",
+    "required_labels",
+    "required_checks",
+    "allowed_paths",
+    "blocked_categories",
+    "max_rule_length",
+    "require_trusted_provenance",
+    "require_no_open_contradictions"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "method": {
+      "enum": [
+        "squash",
+        "merge",
+        "rebase"
+      ]
+    },
+    "allowed_risk": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "required_labels": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "required_checks": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "allowed_paths": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "blocked_categories": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "STYLE",
+          "CODE",
+          "ARCH",
+          "TOOL",
+          "PROCESS",
+          "DATA",
+          "UX",
+          "TEST",
+          "SECURITY",
+          "OTHER"
+        ]
+      }
+    },
+    "max_rule_length": {
+      "type": "integer",
+      "minimum": 20,
+      "maximum": 500
+    },
+    "require_trusted_provenance": {
+      "const": true
+    },
+    "require_no_open_contradictions": {
+      "const": true
+    }
+  }
+}

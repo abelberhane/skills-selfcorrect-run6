@@ -1,0 +1,18 @@
+{
+  "repository": "octocat/self-correcting-copilot-instructions",
+  "comment_id": 98765,
+  "actor": {
+    "login": "maintainer",
+    "association": "OWNER"
+  },
+  "pull_request": {
+    "number": 42,
+    "author": "github-actions[bot]",
+    "labels": [
+      "copilot-authored"
+    ]
+  },
+  "body": "/copilot-learn\ncategory: TEST\nrule: Add unit tests when parser behavior changes.\nrationale: The original implementation omitted parser regression tests.\nscope: path:scripts/\naction: add",
+  "existing_rules": [],
+  "fixture": "workflow-loop"
+}

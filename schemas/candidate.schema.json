@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/candidate.schema.json",
+  "title": "Instruction candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "category",
+    "rule",
+    "rationale",
+    "scope",
+    "state",
+    "action",
+    "provenance",
+    "fingerprint",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^RULE-[A-Z]+-[A-F0-9]{12}$"
+    },
+    "category": {
+      "enum": [
+        "STYLE",
+        "CODE",
+        "ARCH",
+        "TOOL",
+        "PROCESS",
+        "DATA",
+        "UX",
+        "TEST",
+        "SECURITY",
+        "OTHER"
+      ]
+    },
+    "rule": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 500
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 1000
+    },
+    "scope": {
+      "type": "string",
+      "pattern": "^(repository|path:[A-Za-z0-9_./*-]+)$"
+    },
+    "state": {
+      "enum": [
+        "proposed",
+        "active",
+        "superseded",
+        "revoked",
+        "blocked"
+      ]
+    },
+    "action": {
+      "enum": [
+        "add",
+        "supersede",
+        "revoke"
+      ]
+    },
+    "target_id": {
+      "type": "string",
+      "pattern": "^RULE-[A-Z]+-[A-Z0-9-]+$"
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "pull_request",
+        "comment_id",
+        "actor",
+        "actor_association",
+        "source_url"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[^/]+/[^/]+$"
+        },
+        "pull_request": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "comment_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "actor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actor_association": {
+          "enum": [
+            "OWNER",
+            "MEMBER",
+            "COLLABORATOR"
+          ]
+        },
+        "source_url": {
+          "type": "string",
+          "pattern": "^https://github\\.com/"
+        }
+      }
+    },
+    "fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "enum": [
+              "supersede",
+              "revoke"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "target_id"
+        ]
+      }
+    }
+  ]
+}

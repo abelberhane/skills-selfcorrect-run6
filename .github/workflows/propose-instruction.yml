@@ -1,0 +1,139 @@
+name: Propose instruction
+on:
+  issue_comment:
+    types: [created]
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  statuses: write
+jobs:
+  propose:
+    if: >-
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/copilot-learn') &&
+      github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - name: Build sanitized event
+        env:
+          BODY: ${{ github.event.comment.body }}
+          ACTOR: ${{ github.actor }}
+          ASSOCIATION: ${{ github.event.comment.author_association }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          labels=$(gh pr view "$PR_NUMBER" --json labels --jq '[.labels[].name]')
+          author=$(gh pr view "$PR_NUMBER" --json author --jq '.author.login')
+          jq -n --arg repository "$REPOSITORY" --arg body "$BODY" --arg actor "$ACTOR" --arg association "$ASSOCIATION" --argjson comment "$COMMENT_ID" --argjson pr "$PR_NUMBER" --arg author "$author" --argjson labels "$labels" '{repository:$repository,body:$body,comment_id:$comment,actor:{login:$actor,association:$association},pull_request:{number:$pr,author:$author,labels:$labels}}' > "$RUNNER_TEMP/event.json"
+          node scripts/propose-instruction.js "$RUNNER_TEMP/event.json" "$RUNNER_TEMP/candidate.json"
+      - name: Create isolated candidate branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        run: |
+          id=$(jq -r .id "$RUNNER_TEMP/candidate.json")
+          branch="copilot-instruction/$id-$COMMENT_ID"
+          git switch -c "$branch"
+          mkdir -p data/candidates data/audit data/fingerprints
+          cp "$RUNNER_TEMP/candidate.json" "data/candidates/$id.json"
+          jq -n --arg id "$id" --arg fingerprint "$(jq -r .fingerprint "$RUNNER_TEMP/candidate.json")" '{candidate_id:$id,fingerprint:$fingerprint}' > "data/fingerprints/$id.json"
+          node scripts/audit.js "$RUNNER_TEMP/candidate.json" proposed "data/audit/$id.jsonl"
+          node scripts/render-instructions.js .github/copilot-instructions.md "$RUNNER_TEMP/candidate.json" "$RUNNER_TEMP/instructions.md"
+          mv "$RUNNER_TEMP/instructions.md" .github/copilot-instructions.md
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/copilot-instructions.md data
+          git commit -m "Propose learned instruction $id"
+          git push origin "$branch"
+          url=$(gh pr create --base '${{ github.event.repository.default_branch }}' --head "$branch" --title "Instruction candidate: $id" --body "Validated candidate from #${{ github.event.issue.number }}, comment $COMMENT_ID. Revalidation is required after every update." --label copilot-instruction-candidate --label copilot-authored)
+          gh issue comment '${{ github.event.issue.number }}' --body "Created instruction candidate PR: $url"
+          echo "branch=$branch" >> "$GITHUB_ENV"
+          echo "candidate_id=$id" >> "$GITHUB_ENV"
+
+      # GitHub holds workflow runs on bot-authored pull requests for manual
+      # approval, so a pull_request-triggered check would sit pending forever and
+      # nothing could ever merge. The evaluation runs here instead, inside the run
+      # a human triggered, and reports its verdict as a commit status that branch
+      # protection can require by name.
+      - name: Evaluate the candidate and report the required check
+        id: evaluate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          set -o pipefail
+          sha=$(git rev-parse HEAD)
+          number=$(gh pr view "$branch" --json number --jq .number)
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+          verdict=success
+          description='Candidate validated'
+
+          git diff --name-only "origin/$BASE...HEAD" > "$RUNNER_TEMP/paths.txt"
+          if ! xargs node scripts/check-paths.js < "$RUNNER_TEMP/paths.txt"; then
+            verdict=failure; description='Candidate touches a protected path'
+          fi
+
+          git show "origin/$BASE:.github/copilot-instructions.md" > "$RUNNER_TEMP/base-instructions.md"
+          node scripts/render-instructions.js "$RUNNER_TEMP/base-instructions.md" "$RUNNER_TEMP/candidate.json" "$RUNNER_TEMP/expected.md"
+          if ! cmp --silent "$RUNNER_TEMP/expected.md" .github/copilot-instructions.md; then
+            verdict=failure; description='Rendered instructions do not match the candidate'
+          fi
+
+          if ! npm test; then
+            verdict=failure; description='Repository tests failed'
+          fi
+
+          eligible=false
+          if [ "$verdict" = success ]; then
+            jq -n --rawfile paths "$RUNNER_TEMP/paths.txt" \
+              '{labels:["copilot-instruction-candidate","copilot-authored"],paths:($paths|split("\n")|map(select(length>0)))}' \
+              > "$RUNNER_TEMP/context.json"
+            node scripts/evaluate-instruction.js "$RUNNER_TEMP/candidate.json" "$RUNNER_TEMP/context.json" > "$RUNNER_TEMP/evaluation.json"
+            eligible=$(jq -r .autoMergeEligible "$RUNNER_TEMP/evaluation.json")
+            if [ "$eligible" = true ]; then
+              description='Low risk: eligible for auto-merge'
+            else
+              description='Needs human review'
+            fi
+          fi
+          echo "eligible=$eligible" >> "$GITHUB_OUTPUT"
+
+          gh api -X POST "repos/${{ github.repository }}/statuses/$sha" \
+            -f state="$verdict" \
+            -f context='Evaluate instruction candidate' \
+            -f description="$description" >/dev/null
+
+          [ "$verdict" = success ]
+
+      - name: Record the decision on the candidate
+        if: always() && steps.evaluate.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ steps.evaluate.outputs.number }}
+        run: |
+          if [ '${{ steps.evaluate.outputs.eligible }}' = true ]; then
+            gh pr edit "$NUMBER" --add-label copilot-low-risk --add-label copilot-auto-merge-approved
+          else
+            gh pr edit "$NUMBER" --add-label copilot-needs-human-review
+          fi
+
+      - name: Enable guarded auto-merge
+        if: steps.evaluate.outputs.eligible == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ steps.evaluate.outputs.number }}
+        run: |
+          # --auto still waits for every required check and for branch protection.
+          if ! gh pr merge "$NUMBER" --auto --squash; then
+            gh pr comment "$NUMBER" --body 'This candidate qualifies for auto-merge, but auto-merge is not enabled for this repository. Turn it on in Settings, or merge manually once required checks pass.'
+          fi

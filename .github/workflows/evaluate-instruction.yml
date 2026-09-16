@@ -1,0 +1,74 @@
+name: Evaluate instruction candidate
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  evaluate:
+    name: Evaluate instruction candidate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine scope
+        id: scope
+        run: echo "candidate=${{ contains(github.event.pull_request.labels.*.name, 'copilot-instruction-candidate') }}" >> "$GITHUB_OUTPUT"
+      - name: Skip pull requests without an instruction candidate
+        if: steps.scope.outputs.candidate != 'true'
+        run: echo 'No instruction candidate label on this pull request. Nothing to evaluate.'
+      - uses: actions/checkout@v4
+        if: steps.scope.outputs.candidate == 'true'
+        with:
+          # git show needs the base commit, which a shallow clone does not have.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        if: steps.scope.outputs.candidate == 'true'
+        with: { node-version: 20, cache: npm }
+      - name: Install dependencies
+        if: steps.scope.outputs.candidate == 'true'
+        run: npm ci
+      - name: Identify exactly one changed candidate
+        if: steps.scope.outputs.candidate == 'true'
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          gh pr diff '${{ github.event.pull_request.number }}' --name-only > "$RUNNER_TEMP/paths.txt"
+          xargs node scripts/check-paths.js < "$RUNNER_TEMP/paths.txt"
+          grep '^data/candidates/[^/]*\.json$' "$RUNNER_TEMP/paths.txt" > "$RUNNER_TEMP/candidates.txt" || true
+          test "$(wc -l < "$RUNNER_TEMP/candidates.txt" | tr -d ' ')" = 1
+          cp "$(cat "$RUNNER_TEMP/candidates.txt")" "$RUNNER_TEMP/candidate.json"
+      - name: Revalidate rendered instructions
+        if: steps.scope.outputs.candidate == 'true'
+        run: |
+          git show '${{ github.event.pull_request.base.sha }}:.github/copilot-instructions.md' > "$RUNNER_TEMP/base-instructions.md"
+          node scripts/render-instructions.js "$RUNNER_TEMP/base-instructions.md" "$RUNNER_TEMP/candidate.json" "$RUNNER_TEMP/expected.md"
+          cmp --silent "$RUNNER_TEMP/expected.md" .github/copilot-instructions.md
+      - name: Run tests
+        if: steps.scope.outputs.candidate == 'true'
+        run: npm test
+      - name: Revalidate policy and candidate
+        id: policy
+        if: steps.scope.outputs.candidate == 'true'
+        env:
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          jq -n --argjson labels "$LABELS" --rawfile paths "$RUNNER_TEMP/paths.txt" '{labels:$labels,paths:($paths | split("\n") | map(select(length > 0)))}' > "$RUNNER_TEMP/context.json"
+          node scripts/evaluate-instruction.js "$RUNNER_TEMP/candidate.json" "$RUNNER_TEMP/context.json" > "$RUNNER_TEMP/evaluation.json"
+          echo "eligible=$(jq -r .autoMergeEligible "$RUNNER_TEMP/evaluation.json")" >> "$GITHUB_OUTPUT"
+      - name: Replace stale decision labels
+        if: steps.scope.outputs.candidate == 'true'
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          gh pr edit '${{ github.event.pull_request.number }}' --remove-label copilot-low-risk --remove-label copilot-auto-merge-approved --remove-label copilot-needs-human-review 2>/dev/null || true
+          if [ '${{ steps.policy.outputs.eligible }}' = true ]; then
+            gh pr edit '${{ github.event.pull_request.number }}' --add-label copilot-low-risk --add-label copilot-auto-merge-approved
+          else
+            gh pr edit '${{ github.event.pull_request.number }}' --add-label copilot-needs-human-review
+          fi
+      - name: Enable guarded auto-merge
+        if: steps.scope.outputs.candidate == 'true' && steps.policy.outputs.eligible == 'true'
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          if ! gh pr merge '${{ github.event.pull_request.number }}' --auto --squash; then
+            echo 'Auto-merge is unavailable for this repository. Merge manually after required checks pass.'
+            gh pr comment '${{ github.event.pull_request.number }}' --body 'This candidate qualifies for auto-merge, but auto-merge is unavailable for this repository. Private repositories on GitHub Free do not support auto-merge. Merge manually once required checks pass.'
+          fi
