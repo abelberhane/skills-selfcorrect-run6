@@ -23,4 +23,9 @@ function subtotal(cart) {
   return cart.reduce((total, item) => total + item.price * item.quantity, 0);
 }
 
-module.exports = { addItem, removeItem, subtotal };
+function applyDiscount(cart, percent) {
+  const factor = 1 - percent / 100;
+  return cart.map((item) => ({ ...item, price: item.price * factor }));
+}
+
+module.exports = { addItem, removeItem, subtotal, applyDiscount };
